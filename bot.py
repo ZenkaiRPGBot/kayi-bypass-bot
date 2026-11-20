@@ -113,11 +113,39 @@ async def cmd_start(message: types.Message):
         "<b>What I do:</b>\n"
         "• <b>Unshorten Links:</b> Expands bit.ly, tinyurl, cutt.ly, and ad-gate redirect chains.\n"
         "• <b>Strip Trackers:</b> Automatically removes <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, and spyware query tags.\n"
-        "• <b>Reveal Destinations:</b> See where suspicious links lead before clicking!\n\n"
+        "• <b>Reveal Destinations:</b> See where suspicious links lead before clicking!\n"
+        "• <b>Bypass Helper:</b> Type /script to install the 1-click browser auto-skipper for ad-shorteners.\n\n"
         "<b>How to use:</b>\n"
         "Simply send or forward any link directly into this chat 👇"
     )
     await message.reply(welcome_text, parse_mode=ParseMode.HTML, reply_markup=builder.as_markup())
+
+@dp.message(Command("script"))
+@dp.message(Command("userscript"))
+async def cmd_userscript(message: types.Message):
+    guide_text = (
+        f"<b>⚡ {BRAND_NAME} — Auto-Skip Userscript Guide</b>\n\n"
+        "Tired of waiting for 15-second timers and clicking through multi-page blog articles on sites like VPLink, GPLinks, Droplink, etc.?\n\n"
+        "<b>📱 On Android:</b>\n"
+        "1. Install <b>Kiwi Browser</b> or <b>Firefox</b> from Google Play Store.\n"
+        "2. Add the <b>Tampermonkey</b> extension.\n"
+        "3. Tap the <b>Install Userscript</b> button below to add it in 1 tap!\n\n"
+        "<b>💻 On PC (Chrome / Edge / Firefox):</b>\n"
+        "1. Install the <b>Tampermonkey</b> extension.\n"
+        "2. Tap the button below to install the script.\n\n"
+        "<i>Once active, whenever you open any ad-shortener, your browser will automatically fast-forward through all intermediate steps to the final link!</i>"
+    )
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="⚡ Install Userscript (1-Tap)", url="https://raw.githubusercontent.com/nOneCode4u/bypass-shortlinks/main/Bypass_Shortlinks.user.js"))
+    builder.row(types.InlineKeyboardButton(text="📖 Script GitHub Info", url="https://github.com/nOneCode4u/bypass-shortlinks"))
+    channel_url = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
+    builder.row(types.InlineKeyboardButton(text=f"📢 Join {CHANNEL_USERNAME}", url=channel_url))
+    await message.reply(
+        guide_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=builder.as_markup(),
+        link_preview_options=types.LinkPreviewOptions(is_disabled=True)
+    )
 
 @dp.message(Command("ping"))
 async def cmd_ping(message: types.Message, bot: Bot):
@@ -197,14 +225,15 @@ async def handle_text_links(message: types.Message, bot: Bot):
 
         if challenge:
             response = (
-                f"<b>🦅 {BRAND_NAME} — Verification Required</b>\n\n"
+                f"<b>🦅 {BRAND_NAME} — Verification Gate Detected</b>\n\n"
                 f"🎯 <b>URL:</b>\n<code>{url}</code>\n\n"
                 f"⚠️ <b>Protection Gate:</b> <code>{challenge}</code>\n"
-                f"This target is protected by an interactive anti-bot gate. "
-                f"Please open and complete it directly in your browser."
+                f"This shortener enforces an interactive human check in your browser.\n\n"
+                f"💡 <b>Tip:</b> Install the <b>Bypass Userscript</b> to auto-skip all timer countdowns and blog hops in your browser!"
             )
             builder = InlineKeyboardBuilder()
             builder.row(types.InlineKeyboardButton(text="🌐 Open in Browser", url=url))
+            builder.row(types.InlineKeyboardButton(text="⚡ Auto-Skip Userscript (1-Tap)", url="https://raw.githubusercontent.com/nOneCode4u/bypass-shortlinks/main/Bypass_Shortlinks.user.js"))
             builder.row(types.InlineKeyboardButton(text=f"📢 Join {CHANNEL_USERNAME}", url=channel_url))
             await message.reply(
                 response,
