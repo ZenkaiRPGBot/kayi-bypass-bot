@@ -2,7 +2,6 @@ import re
 import base64
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import aiohttp
-from bs4 import BeautifulSoup if False else None
 
 # Tracking query parameters to strip
 TRACKING_PARAMS = {
