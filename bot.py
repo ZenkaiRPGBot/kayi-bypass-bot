@@ -192,13 +192,33 @@ async def handle_text_links(message: types.Message, bot: Bot):
         hops = data["hops"]
         removed = data["removed_trackers"]
         title = data.get("page_title")
+        challenge = data.get("challenge_detected")
+        channel_url = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
+
+        if challenge:
+            response = (
+                f"<b>🦅 {BRAND_NAME} — Verification Required</b>\n\n"
+                f"🎯 <b>URL:</b>\n<code>{url}</code>\n\n"
+                f"⚠️ <b>Protection Gate:</b> <code>{challenge}</code>\n"
+                f"This target is protected by an interactive anti-bot gate. "
+                f"Please open and complete it directly in your browser."
+            )
+            builder = InlineKeyboardBuilder()
+            builder.row(types.InlineKeyboardButton(text="🌐 Open in Browser", url=url))
+            builder.row(types.InlineKeyboardButton(text=f"📢 Join {CHANNEL_USERNAME}", url=channel_url))
+            await message.reply(
+                response,
+                parse_mode=ParseMode.HTML,
+                reply_markup=builder.as_markup(),
+                link_preview_options=types.LinkPreviewOptions(is_disabled=True)
+            )
+            continue
 
         tracker_str = ", ".join(removed) if removed else "None detected"
         title_section = f"📑 <b>Page Title:</b> {title}\n" if title else ""
 
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🌐 Open Clean Link", url=clean_url))
-        channel_url = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
         builder.row(types.InlineKeyboardButton(text=f"📢 Join {CHANNEL_USERNAME}", url=channel_url))
 
         response = (

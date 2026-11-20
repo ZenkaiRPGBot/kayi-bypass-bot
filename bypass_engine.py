@@ -85,6 +85,7 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     }
 
+    challenge_detected = None
     try:
         while hops < max_hops:
             # Check for embedded target before request
@@ -114,11 +115,18 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
                 else:
                     # Final destination reached, extract page title if HTML
                     if "text/html" in resp.headers.get("Content-Type", ""):
-                        chunk = await resp.content.read(4096)
+                        chunk = await resp.content.read(8192)
                         text = chunk.decode("utf-8", errors="ignore")
                         title_match = re.search(r'<title[^>]*>(.*?)</title>', text, re.IGNORECASE | re.DOTALL)
                         if title_match:
                             page_title = title_match.group(1).strip()
+                        
+                        if "challenges.cloudflare.com" in text or "cf-turnstile" in text or (page_title and "Just a moment" in page_title):
+                            challenge_detected = "Cloudflare Turnstile"
+                        elif "hcaptcha.com" in text or "h-captcha" in text:
+                            challenge_detected = "hCaptcha"
+                        elif "recaptcha" in text.lower():
+                            challenge_detected = "reCAPTCHA"
                     break
     except Exception as e:
         print(f"[bypass_engine] Redirect notice for {current_url}: {e}")
@@ -137,5 +145,6 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
         "clean_url": clean_url,
         "hops": hops,
         "removed_trackers": removed_trackers,
-        "page_title": page_title
+        "page_title": page_title,
+        "challenge_detected": challenge_detected
     }
