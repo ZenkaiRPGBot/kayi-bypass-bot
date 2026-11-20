@@ -70,9 +70,17 @@ def check_embedded_destination(url_str: str) -> str | None:
                 pass
     return None
 
+# Known ad-gate shortener networks protected by Cloudflare Turnstile / anti-bot timers
+INTERACTIVE_GATE_SHORTENERS = {
+    "vplink.in", "vplinks.in", "gplinks.co", "gplinks.in", "droplink.co",
+    "droplink.in", "adlinkfly", "earn2me", "narzolinks", "instantearn",
+    "jobsarkar.in", "linkvertise.com"
+}
+
 async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_hops: int = 15) -> dict:
     """
-    Follows HTTP redirect chains, expands shortened links, and returns the final cleaned URL.
+    Follows HTTP redirect chains and JavaScript redirects, expands shortened links,
+    detects anti-bot verification gates, and returns the final cleaned URL.
     """
     current_url = start_url
     hops = 0
@@ -85,6 +93,14 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
     }
 
     challenge_detected = None
+
+    # Check if initial domain itself is a known Turnstile/Interactive Gate
+    start_domain = urlparse(start_url).netloc.lower()
+    for known in INTERACTIVE_GATE_SHORTENERS:
+        if known in start_domain:
+            challenge_detected = "Cloudflare Turnstile & Ad Gate"
+            break
+
     try:
         while hops < max_hops:
             # Check for embedded target before request
@@ -93,6 +109,12 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
                 current_url = embedded
                 history.append(current_url)
                 hops += 1
+
+            domain = urlparse(current_url).netloc.lower()
+            for known in INTERACTIVE_GATE_SHORTENERS:
+                if known in domain:
+                    challenge_detected = "Cloudflare Turnstile & Ad Gate"
+                    break
 
             async with session.get(current_url, headers=headers, allow_redirects=False, ssl=False, timeout=aiohttp.ClientTimeout(total=6)) as resp:
                 # 301, 302, 303, 307, 308 redirects
@@ -112,20 +134,34 @@ async def resolve_url_chain(session: aiohttp.ClientSession, start_url: str, max_
                     history.append(current_url)
                     hops += 1
                 else:
-                    # Final destination reached, extract page title if HTML
+                    # 200 OK: Check for HTML redirects, titles, or anti-bot challenges
                     if "text/html" in resp.headers.get("Content-Type", ""):
-                        chunk = await resp.content.read(8192)
+                        chunk = await resp.content.read(16384)
                         text = chunk.decode("utf-8", errors="ignore")
                         title_match = re.search(r'<title[^>]*>(.*?)</title>', text, re.IGNORECASE | re.DOTALL)
                         if title_match:
                             page_title = title_match.group(1).strip()
                         
+                        # Detect Turnstile / CAPTCHA signatures
                         if "challenges.cloudflare.com" in text or "cf-turnstile" in text or (page_title and "Just a moment" in page_title):
                             challenge_detected = "Cloudflare Turnstile"
                         elif "hcaptcha.com" in text or "h-captcha" in text:
                             challenge_detected = "hCaptcha"
                         elif "recaptcha" in text.lower():
                             challenge_detected = "reCAPTCHA"
+
+                        # Check for JavaScript location.href or meta refresh redirects
+                        js_match = re.search(r'(?:window\.)?location(?:\.href)?\s*=\s*["\'](https?://[^"\']+)["\']', text)
+                        if not js_match:
+                            js_match = re.search(r'<meta[^>]+http-equiv=["\']refresh["\'][^>]+content=["\'][^"\']*url=([^"\']+)["\']', text, re.IGNORECASE)
+
+                        if js_match:
+                            next_url = js_match.group(1).replace("&amp;", "&")
+                            if next_url != current_url and next_url not in history:
+                                current_url = next_url
+                                history.append(current_url)
+                                hops += 1
+                                continue
                     break
     except Exception as e:
         print(f"[bypass_engine] Redirect notice for {current_url}: {e}")
